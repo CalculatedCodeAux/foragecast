@@ -1,0 +1,361 @@
+---
+import Base from '../layouts/Base.astro';
+
+// Featured guide data (hand-crafted from model output)
+const featuredGuide = {
+  location: "Pisgah National Forest, NC",
+  dateRange: "Late March 2026",
+  coverage: 72,
+  plants: [
+    { name: "Ramps (Wild Leeks)", latin: "Allium tricoccum", confidence: "high", count: 47 },
+    { name: "Wood Sorrel", latin: "Oxalis acetosella", confidence: "medium", count: 12 },
+    { name: "Chickweed", latin: "Stellaria media", confidence: "medium", count: 9 },
+    { name: "Violet Leaves", latin: "Viola sororia", confidence: "low", count: 3 },
+    { name: "Dandelion", latin: "Taraxacum officinale", confidence: "high", count: 31 },
+  ],
+};
+
+const secondaryGuides = [
+  {
+    location: "Olympic National Forest, WA",
+    dateRange: "Early April 2026",
+    plants: "Stinging Nettle, Miner's Lettuce, Salmonberry + 11 more",
+    plantCount: 14,
+  },
+  {
+    location: "Green Mountain NF, VT",
+    dateRange: "Late March 2026",
+    plants: "Fiddleheads, Ramps, Trout Lily, Dandelion + 6 more",
+    plantCount: 10,
+  },
+];
+---
+
+<Base title="ForageCast — Know What's Growing Before You Go">
+  <!-- Hero: proof first, not claims -->
+  <section class="hero">
+    <div class="hero-content">
+      <p class="hero-eyebrow">Predictive foraging guides</p>
+      <h1>Know What's Growing<br />Before You Go</h1>
+      <p class="hero-sub">
+        Location-specific plant guides based on observation data.
+        Edibility, traditional uses, look-alikes, downloadable for the trail.
+      </p>
+
+      <!-- Live proof: sample guide right in the hero -->
+      <div class="sample-guide">
+        <div class="guide-header">
+          <div class="guide-location">
+            <span class="location-pin">&#x1F4CD;</span>
+            <div>
+              <strong>{featuredGuide.location}</strong>
+              <span class="guide-date">{featuredGuide.dateRange}</span>
+            </div>
+          </div>
+          <div class="coverage-badge">
+            <span class="coverage-bar" style={`width: ${featuredGuide.coverage}%`}></span>
+            <span class="coverage-label">{featuredGuide.coverage}% data coverage</span>
+          </div>
+        </div>
+        <ul class="plant-preview">
+          {featuredGuide.plants.map((plant) => (
+            <li class="plant-row">
+              <span class={`conf-badge conf-${plant.confidence}`}>
+                {plant.confidence === 'high' ? 'High' : plant.confidence === 'medium' ? 'Med' : 'Low'}
+              </span>
+              <div class="plant-info">
+                <span class="plant-name">{plant.name}</span>
+                <span class="plant-latin">{plant.latin}</span>
+              </div>
+              <span class="obs-count">{plant.count} obs</span>
+            </li>
+          ))}
+        </ul>
+        <a href="#get-app" class="guide-cta">Open full guide in the app &rarr;</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Secondary guides -->
+  <section class="more-guides">
+    <h2>More locations</h2>
+    <div class="guide-cards">
+      {secondaryGuides.map((guide) => (
+        <div class="guide-card">
+          <strong>{guide.location}</strong>
+          <span class="guide-date">{guide.dateRange}</span>
+          <p class="card-plants">{guide.plants}</p>
+          <span class="plant-count">{guide.plantCount} plants</span>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- Request your area -->
+  <section class="request-area" id="request">
+    <h2>Don't see your area?</h2>
+    <p>Tell us where you forage. We'll email you monthly about what's growing nearby.</p>
+    <form class="email-form" action="https://forage.optimizeforllm.com/subscribe" method="POST">
+      <input type="email" name="email" placeholder="your@email.com" required />
+      <input type="text" name="location_text" placeholder="Your foraging area (e.g., Pisgah NF)" />
+      <button type="submit">Notify me</button>
+    </form>
+    <p class="privacy-note">
+      We'll email you monthly about what's growing near you. Unsubscribe anytime.
+      No spam, ever.
+    </p>
+  </section>
+
+  <!-- Get the app -->
+  <section class="get-app" id="get-app">
+    <h2>Get the app</h2>
+    <p>Download ForageCast for iOS or Android. Save guides for offline use on the trail.</p>
+    <div class="app-links">
+      <a href="#" class="app-badge">App Store (coming soon)</a>
+      <a href="#" class="app-badge">Google Play (coming soon)</a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <p class="disclaimer">
+      This is a planning aid, not an identification tool.
+      Always verify plants with a physical field guide before consuming.
+      Prediction data from <a href="https://www.inaturalist.org">iNaturalist</a> observations
+      and <a href="https://pfaf.org">PFAF.org</a>.
+    </p>
+  </footer>
+</Base>
+
+<style>
+  /* Hero */
+  .hero {
+    padding: 64px 24px 48px;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .hero-eyebrow {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--primary);
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  .hero h1 {
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--text);
+    margin-bottom: 16px;
+  }
+  .hero-sub {
+    font-size: 18px;
+    color: var(--text-muted);
+    max-width: 520px;
+    margin-bottom: 32px;
+    line-height: 1.6;
+  }
+
+  /* Sample guide (the proof) */
+  .sample-guide {
+    background: var(--surface);
+    border: 1px solid #e0ddd4;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .guide-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #f0ede4;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .guide-location {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .guide-location strong {
+    display: block;
+    font-size: 16px;
+  }
+  .location-pin { font-size: 20px; }
+  .guide-date {
+    font-size: 13px;
+    color: var(--text-muted);
+    display: block;
+  }
+  .coverage-badge {
+    position: relative;
+    background: #f0ede4;
+    border-radius: 8px;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+    overflow: hidden;
+  }
+  .coverage-bar {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    background: var(--conf-high-bg);
+    border-radius: 8px;
+    z-index: 0;
+  }
+  .coverage-label { position: relative; z-index: 1; }
+
+  /* Plant list */
+  .plant-preview {
+    list-style: none;
+    padding: 0;
+  }
+  .plant-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    border-bottom: 1px solid #f5f2ea;
+  }
+  .plant-row:last-child { border-bottom: none; }
+  .conf-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .conf-high { background: var(--conf-high-bg); color: var(--conf-high); }
+  .conf-medium { background: var(--conf-med-bg); color: var(--conf-med); }
+  .conf-low { background: var(--conf-low-bg); color: var(--conf-low); }
+  .plant-info { flex: 1; }
+  .plant-name { display: block; font-size: 15px; font-weight: 500; }
+  .plant-latin { display: block; font-size: 13px; color: var(--text-muted); font-style: italic; }
+  .obs-count { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+
+  .guide-cta {
+    display: block;
+    text-align: center;
+    padding: 14px 20px;
+    background: var(--primary);
+    color: white;
+    font-weight: 600;
+    font-size: 15px;
+    border-radius: 0 0 12px 12px;
+    transition: background 0.2s;
+  }
+  .guide-cta:hover { background: var(--primary-light); text-decoration: none; }
+
+  /* More guides */
+  .more-guides {
+    padding: 48px 24px;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .more-guides h2 {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 20px;
+  }
+  .guide-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .guide-card {
+    background: var(--surface);
+    border: 1px solid #e0ddd4;
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .guide-card strong { font-size: 15px; display: block; }
+  .card-plants { font-size: 13px; color: var(--text-muted); margin-top: 8px; }
+  .plant-count { font-size: 12px; color: var(--primary); font-weight: 500; margin-top: 8px; display: inline-block; }
+
+  /* Request area */
+  .request-area {
+    padding: 48px 24px;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .request-area h2 { font-size: 24px; font-weight: 600; margin-bottom: 8px; }
+  .request-area > p { color: var(--text-muted); margin-bottom: 20px; }
+  .email-form {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .email-form input {
+    flex: 1;
+    min-width: 200px;
+    padding: 12px 16px;
+    border: 1px solid #d4d0c8;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 15px;
+    background: var(--surface);
+  }
+  .email-form input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(45, 80, 22, 0.1);
+  }
+  .email-form button {
+    padding: 12px 24px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .email-form button:hover { background: var(--primary-light); }
+  .privacy-note { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+
+  /* Get app */
+  .get-app {
+    padding: 48px 24px;
+    max-width: 720px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .get-app h2 { font-size: 24px; font-weight: 600; margin-bottom: 8px; }
+  .get-app > p { color: var(--text-muted); margin-bottom: 20px; }
+  .app-links { display: flex; gap: 12px; justify-content: center; }
+  .app-badge {
+    padding: 12px 24px;
+    border: 2px solid var(--primary);
+    border-radius: 8px;
+    color: var(--primary);
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+  .app-badge:hover { background: var(--primary); color: white; text-decoration: none; }
+
+  /* Footer */
+  footer {
+    padding: 32px 24px;
+    max-width: 720px;
+    margin: 0 auto;
+    border-top: 1px solid #e0ddd4;
+  }
+  .disclaimer {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  /* Mobile */
+  @media (max-width: 600px) {
+    .hero h1 { font-size: 28px; }
+    .hero-sub { font-size: 16px; }
+    .guide-cards { grid-template-columns: 1fr; }
+    .email-form { flex-direction: column; }
+    .app-links { flex-direction: column; align-items: center; }
+  }
+</style>
