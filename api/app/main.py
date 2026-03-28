@@ -15,6 +15,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
@@ -39,6 +40,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/", response_class=HTMLResponse)
+def root():
+    return """<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>ForageCast API</title>
+<style>body{font-family:system-ui;max-width:600px;margin:60px auto;padding:0 20px;color:#1a1a1a;background:#fafaf5}
+h1{color:#2D5016}a{color:#2D5016}.endpoint{background:#fff;border:1px solid #e0ddd4;border-radius:8px;padding:12px 16px;margin:8px 0}
+code{background:#e8f0e4;padding:2px 6px;border-radius:4px;font-size:14px}</style></head>
+<body><h1>ForageCast API</h1>
+<p>Predictive foraging trip planner. <a href="/docs">Interactive API docs</a></p>
+<div class="endpoint"><code>GET /predict?lat=35.3&lng=-82.8&start=2026-03-29&end=2026-04-04</code><br>Predict plants for a location and date range</div>
+<div class="endpoint"><code>GET /plants/{id}</code><br>Full plant detail with edibility, warnings, photos</div>
+<div class="endpoint"><code>GET /health</code><br>API health check</div>
+<div class="endpoint"><code>GET /coverage?min_lat=...&max_lat=...&min_lng=...&max_lng=...</code><br>Observation density heatmap</div>
+<p style="margin-top:24px;color:#6b6b5e;font-size:14px">Download the app: <a href="https://files.optillm.com/foragecast-v0.1.0.apk">Android APK</a></p>
+</body></html>"""
 
 
 def _cache_key(lat: float, lng: float, start: date, end: date) -> str:
