@@ -1,11 +1,10 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../services/api_client.dart';
-import '../services/geocoding.dart';
+import '../widgets/location_picker.dart';
 import 'guide_screen.dart';
 
-/// Home screen: branded snapshot + location search + date picker + saved guides.
+/// Home screen: branded snapshot + location picker + date picker + saved guides.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -14,19 +13,12 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final _searchController = TextEditingController();
   final _apiClient = ApiClient();
-  final _geocoding = GeocodingService();
 
   int _selectedWeekOffset = 1;
   bool _isLoading = false;
-  bool _isSearching = false;
   String? _error;
-
-  // Geocoding state
-  List<GeocodingResult> _searchResults = [];
-  GeocodingResult? _selectedLocation;
-  Timer? _debounce;
+  SelectedLocation? _selectedLocation;
 
   DateTime get _weekStart {
     final now = DateTime.now();
@@ -36,47 +28,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   DateTime get _weekEnd => _weekStart.add(const Duration(days: 6));
 
-  void _onSearchChanged(String query) {
-    // Clear selection when user edits text
-    if (_selectedLocation != null) {
-      setState(() => _selectedLocation = null);
-    }
-
-    _debounce?.cancel();
-    if (query.trim().length < 3) {
-      setState(() => _searchResults = []);
-      return;
-    }
-
-    _debounce = Timer(const Duration(milliseconds: 500), () async {
-      if (!mounted) return;
-      setState(() => _isSearching = true);
-      try {
-        final results = await _geocoding.search(query);
-        if (mounted) {
-          setState(() {
-            _searchResults = results;
-            _isSearching = false;
-          });
-        }
-      } on GeocodingException {
-        if (mounted) setState(() => _isSearching = false);
-      }
-    });
-  }
-
-  void _selectLocation(GeocodingResult result) {
-    setState(() {
-      _selectedLocation = result;
-      _searchController.text = result.shortName;
-      _searchResults = [];
-    });
-    FocusScope.of(context).unfocus();
-  }
-
   Future<void> _generateGuide() async {
     if (_selectedLocation == null) {
-      setState(() => _error = 'Select a location from the search results first.');
+      setState(() => _error = 'Pick a location first: search, use GPS, or tap the map.');
       return;
     }
 
@@ -124,10 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       body: SafeArea(
         child: GestureDetector(
-          onTap: () {
-            FocusScope.of(context).unfocus();
-            setState(() => _searchResults = []);
-          },
+          onTap: () => FocusScope.of(context).unfocus(),
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(ForageTheme.sp16),
             child: Column(
@@ -180,117 +131,25 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: ForageTheme.sp4),
                 Text(
-                  'Enter a location and date to see what\'s likely growing',
+                  'Search, use your GPS, or tap the map',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: ForageTheme.textMuted,
                       ),
                 ),
                 const SizedBox(height: ForageTheme.sp16),
 
-                // Location search with autocomplete
-                TextField(
-                  controller: _searchController,
-                  onChanged: _onSearchChanged,
-                  decoration: InputDecoration(
-                    hintText: 'Search for a trailhead, park, or town...',
-                    prefixIcon: _selectedLocation != null
-                        ? const Icon(Icons.check_circle, color: ForageTheme.primary)
-                        : const Icon(Icons.location_on_outlined),
-                    suffixIcon: _isSearching
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox(
-                              width: 20, height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        : _searchController.text.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear, size: 20),
-                                onPressed: () {
-                                  _searchController.clear();
-                                  setState(() {
-                                    _selectedLocation = null;
-                                    _searchResults = [];
-                                    _error = null;
-                                  });
-                                },
-                              )
-                            : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFFD4D0C8)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(
-                        color: _selectedLocation != null
-                            ? ForageTheme.primary
-                            : const Color(0xFFD4D0C8),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: ForageTheme.primary, width: 2),
-                    ),
-                    filled: true,
-                    fillColor: ForageTheme.surface,
-                  ),
+                // Location picker (search + GPS + map)
+                LocationPicker(
+                  initialLocation: _selectedLocation,
+                  onLocationSelected: (loc) {
+                    setState(() {
+                      _selectedLocation = loc;
+                      _error = null;
+                    });
+                  },
                 ),
 
-                // Search results dropdown
-                if (_searchResults.isNotEmpty)
-                  Container(
-                    margin: const EdgeInsets.only(top: 2),
-                    decoration: BoxDecoration(
-                      color: ForageTheme.surface,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFD4D0C8)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: _searchResults.map((result) {
-                        return InkWell(
-                          onTap: () => _selectLocation(result),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: ForageTheme.sp12,
-                              vertical: ForageTheme.sp12,
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.location_on_outlined,
-                                    size: 18, color: ForageTheme.textMuted),
-                                const SizedBox(width: ForageTheme.sp8),
-                                Expanded(
-                                  child: Text(
-                                    result.shortName,
-                                    style: const TextStyle(fontSize: 14),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                Text(
-                                  '${result.lat.toStringAsFixed(2)}, ${result.lng.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: ForageTheme.textMuted,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-
-                const SizedBox(height: ForageTheme.sp12),
+                const SizedBox(height: ForageTheme.sp16),
 
                 // Date pills
                 Row(
@@ -424,12 +283,5 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    _debounce?.cancel();
-    super.dispose();
   }
 }
