@@ -35,7 +35,9 @@ def predict_plants(
     Returns (plants, coverage_score) for the given location and date range.
     """
     radius_m = settings.prediction_radius_km * 1000
-    point = ST_MakePoint(lng, lat)
+    from sqlalchemy import cast
+    from geoalchemy2 import Geography
+    point = cast(ST_SetSRID(ST_MakePoint(lng, lat), 4326), Geography)
 
     # Date window: same day-of-year range across all years, ± window
     window = timedelta(weeks=settings.prediction_date_window_weeks)
@@ -64,9 +66,8 @@ def predict_plants(
         .filter(
             ST_DWithin(
                 Observation.location,
-                ST_SetSRID(point, 4326),
+                point,
                 radius_m,
-                use_spheroid=True,
             ),
             date_filter,
         )
@@ -124,7 +125,9 @@ def _estimate_peak_season(
     db: Session, taxon_id: int, lat: float, lng: float, radius_m: float
 ) -> PeakSeason | None:
     """Estimate peak season by finding the month with most observations."""
-    point = ST_MakePoint(lng, lat)
+    from sqlalchemy import cast
+    from geoalchemy2 import Geography
+    point = cast(ST_SetSRID(ST_MakePoint(lng, lat), 4326), Geography)
 
     result = (
         db.query(
@@ -135,9 +138,8 @@ def _estimate_peak_season(
             Observation.taxon_id == taxon_id,
             ST_DWithin(
                 Observation.location,
-                ST_SetSRID(point, 4326),
+                point,
                 radius_m,
-                use_spheroid=True,
             ),
         )
         .group_by("month")
