@@ -107,6 +107,15 @@ def predict_plants(
         month_name = date_start.strftime("%B")
         reason += f" in {month_name}"
 
+        # Get thumbnail from first stored photo if available
+        thumb = None
+        if meta.photos and isinstance(meta.photos, list) and len(meta.photos) > 0:
+            first = meta.photos[0]
+            if isinstance(first, dict):
+                url = first.get("url", "")
+                # Use square size for thumbnails (smaller/faster)
+                thumb = url.replace("/medium.", "/square.") if url else None
+
         plants.append(PredictedPlant(
             id=meta.id,
             common_name=meta.common_name,
@@ -116,6 +125,9 @@ def predict_plants(
             reason=reason,
             observation_count=obs_count,
             peak_season=peak,
+            thumbnail_url=thumb,
+            edibility_rating=meta.edibility_rating or 0,
+            medicinal_rating=meta.medicinal_rating or 0,
         ))
 
     return plants, round(coverage, 2)

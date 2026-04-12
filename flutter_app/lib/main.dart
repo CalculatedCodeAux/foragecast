@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'theme.dart';
 import 'screens/safety_gate.dart';
 import 'screens/home_screen.dart';
+import 'screens/saved_guides_screen.dart';
+import 'screens/settings_screen.dart';
 
 void main() {
   runApp(const ForageCastApp());
@@ -68,8 +70,8 @@ class _AppShellState extends State<AppShell> {
 
     final screens = [
       const HomeScreen(),
-      const _SavedGuidesPlaceholder(),
-      const _SettingsPlaceholder(),
+      const SavedGuidesScreen(),
+      const SettingsScreen(),
     ];
 
     return Scaffold(
@@ -92,75 +94,6 @@ class _AppShellState extends State<AppShell> {
             icon: Icon(Icons.settings_outlined),
             activeIcon: Icon(Icons.settings),
             label: 'Settings',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SavedGuidesPlaceholder extends StatelessWidget {
-  const _SavedGuidesPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Saved Guides')),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.bookmark_border, size: 48, color: ForageTheme.textMuted.withValues(alpha: 0.4)),
-            const SizedBox(height: ForageTheme.sp16),
-            const Text('No saved guides yet'),
-            const SizedBox(height: ForageTheme.sp8),
-            Text(
-              'Guides you save for offline will appear here.',
-              style: TextStyle(color: ForageTheme.textMuted.withValues(alpha: 0.7)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SettingsPlaceholder extends StatelessWidget {
-  const _SettingsPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
-        children: [
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: const Text('About ForageCast'),
-            subtitle: const Text('v0.1.0'),
-            onTap: () {},
-          ),
-          ListTile(
-            leading: const Icon(Icons.shield_outlined),
-            title: const Text('Safety disclaimer'),
-            onTap: () {
-              showDialog(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Safety Notice'),
-                  content: const Text(
-                    'This app is a planning aid, not an identification tool. '
-                    'Always verify plants with a physical field guide before consuming.',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('OK'),
-                    ),
-                  ],
-                ),
-              );
-            },
           ),
         ],
       ),

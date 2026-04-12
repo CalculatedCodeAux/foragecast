@@ -9,16 +9,21 @@ Endpoints:
   GET  /health     — health check
   POST /subscribe  — email capture for monthly notifications
 """
+import json
+import logging
 import secrets
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
+import httpx
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
+
+log = logging.getLogger(__name__)
 
 from app.config import settings
 from app.database import get_db
@@ -29,7 +34,8 @@ from app.predict import predict_plants
 from app.schemas import (
     CoverageHexBin, CoverageResponse, EmailSubscribeRequest,
     FeedbackRequest, FeedbackResponse, GuideResponse, HealthResponse,
-    Location, DateRange, PlantDetailResponse, EdiblePart, Warning, Photo,
+    Location, DateRange, PlantDetailResponse, PhysicalCharacteristics,
+    EdiblePart, Warning, Photo,
 )
 
 app = FastAPI(title="Foraging Prediction API", version="0.1.0")
@@ -55,7 +61,7 @@ code{background:#e8f0e4;padding:2px 6px;border-radius:4px;font-size:14px}</style
 <div class="endpoint"><code>GET /plants/{id}</code><br>Full plant detail with edibility, warnings, photos</div>
 <div class="endpoint"><code>GET /health</code><br>API health check</div>
 <div class="endpoint"><code>GET /coverage?min_lat=...&max_lat=...&min_lng=...&max_lng=...</code><br>Observation density heatmap</div>
-<p style="margin-top:24px;color:#6b6b5e;font-size:14px">Download the app: <a href="https://files.optillm.com/foragecast-v0.1.0.apk">Android APK</a></p>
+<p style="margin-top:24px;color:#6b6b5e;font-size:14px">Download the app: <a href="https://files.optillm.com/foragecast-v1.1.0.apk">Android APK (v1.1.0)</a></p>
 </body></html>"""
 
 
@@ -133,6 +139,55 @@ def get_prediction(
 # ── GET /plants/{plant_id} ───────────────────────────────────────────
 
 
+def _fetch_inat_photos(scientific_name: str, max_photos: int = 4) -> list[Photo]:
+    """Fetch CC-licensed photos from iNaturalist API by searching scientific name."""
+    try:
+        with httpx.Client(timeout=10) as client:
+            # Search for the taxon by scientific name
+            search = client.get(
+                "https://api.inaturalist.org/v1/taxa",
+                params={"q": scientific_name, "rank": "species", "per_page": 1},
+                headers={"User-Agent": "ForageCast/1.1.0"},
+            )
+            if search.status_code != 200:
+                return []
+            results = search.json().get("results", [])
+            if not results:
+                return []
+            inat_id = results[0].get("id")
+            if not inat_id:
+                return []
+
+            # Fetch full taxon detail (includes taxon_photos)
+            detail = client.get(
+                f"https://api.inaturalist.org/v1/taxa/{inat_id}",
+                headers={"User-Agent": "ForageCast/1.1.0"},
+            )
+            if detail.status_code != 200:
+                return []
+            taxon_results = detail.json().get("results", [])
+            if not taxon_results:
+                return []
+            taxon = taxon_results[0]
+
+            photos = []
+            for tp in taxon.get("taxon_photos", [])[:max_photos]:
+                photo = tp.get("photo", {})
+                url = photo.get("medium_url") or photo.get("url", "")
+                if not url:
+                    continue
+                url = url.replace("/square.", "/medium.")
+                photos.append(Photo(
+                    url=url,
+                    label="Observation photo",
+                    attribution=photo.get("attribution", "iNaturalist CC"),
+                ))
+            return photos
+    except Exception as e:
+        log.warning(f"iNat photo fetch failed for {scientific_name}: {e}")
+        return []
+
+
 @app.get("/plants/{plant_id}", response_model=PlantDetailResponse)
 def get_plant_detail(plant_id: str, db: Session = Depends(get_db)):
     meta = db.query(PlantMetadata).filter_by(id=plant_id).first()
@@ -145,7 +200,7 @@ def get_plant_detail(plant_id: str, db: Session = Depends(get_db)):
             try:
                 edible_parts.append(EdiblePart(**ep))
             except (TypeError, KeyError):
-                continue  # skip malformed entries, log in production
+                continue
 
     warnings = []
     if meta.warnings:
@@ -163,11 +218,40 @@ def get_plant_detail(plant_id: str, db: Session = Depends(get_db)):
             except (TypeError, KeyError):
                 continue
 
+    # If no stored photos, fetch from iNaturalist on-demand
+    if not photos and meta.scientific_name:
+        photos = _fetch_inat_photos(meta.scientific_name)
+        # Cache the fetched photos back to the DB for next time
+        if photos:
+            try:
+                meta.photos = [{"url": p.url, "label": p.label, "attribution": p.attribution} for p in photos]
+                db.commit()
+            except Exception:
+                db.rollback()
+
+    # Build physical characteristics
+    physical = None
+    if any([meta.habit, meta.height, meta.flowering_time, meta.habitat, meta.native_range]):
+        physical = PhysicalCharacteristics(
+            habit=meta.habit,
+            height=meta.height,
+            width=meta.width,
+            deciduous_evergreen=meta.deciduous_evergreen,
+            flowering_time=meta.flowering_time,
+            habitat=meta.habitat,
+            native_range=meta.native_range,
+            hardiness_zone=meta.hardiness_zone,
+            pollinators=meta.pollinators,
+        )
+
     return PlantDetailResponse(
         id=meta.id,
         common_name=meta.common_name,
         scientific_name=meta.scientific_name,
         family=meta.family,
+        edibility_rating=meta.edibility_rating or 0,
+        medicinal_rating=meta.medicinal_rating or 0,
+        physical=physical,
         edible_parts=edible_parts,
         traditional_uses=meta.traditional_uses,
         warnings=warnings,

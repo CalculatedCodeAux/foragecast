@@ -57,6 +57,17 @@ class PlantMetadata(Base):
     warnings = Column(JSONB)       # [{"type": "lookalike", "severity": "high", ...}]
     photos = Column(JSONB)         # [{"url": "...", "label": "...", "attribution": "..."}]
     is_edible = Column(Boolean, default=True)
+    edibility_rating = Column(Integer, default=0)
+    medicinal_rating = Column(Integer, default=0)
+    habit = Column(Text)
+    height = Column(Text)
+    width = Column(Text)
+    deciduous_evergreen = Column(Text)
+    flowering_time = Column(Text)
+    habitat = Column(Text)
+    native_range = Column(Text)
+    hardiness_zone = Column(Integer)
+    pollinators = Column(Text)
     data_sources = Column(JSONB, default=list)
     curated_by = Column(Text)
 

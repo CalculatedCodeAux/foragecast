@@ -16,6 +16,9 @@ class PredictedPlant(BaseModel):
     reason: str
     observation_count: int
     peak_season: PeakSeason | None = None
+    thumbnail_url: str | None = None
+    edibility_rating: int = 0
+    medicinal_rating: int = 0
 
 
 class Location(BaseModel):
@@ -56,11 +59,26 @@ class Photo(BaseModel):
     attribution: str
 
 
+class PhysicalCharacteristics(BaseModel):
+    habit: str | None = None
+    height: str | None = None
+    width: str | None = None
+    deciduous_evergreen: str | None = None
+    flowering_time: str | None = None
+    habitat: str | None = None
+    native_range: str | None = None
+    hardiness_zone: int | None = None
+    pollinators: str | None = None
+
+
 class PlantDetailResponse(BaseModel):
     id: str
     common_name: str
     scientific_name: str
     family: str | None = None
+    edibility_rating: int = 0
+    medicinal_rating: int = 0
+    physical: PhysicalCharacteristics | None = None
     edible_parts: list[EdiblePart]
     traditional_uses: str | None = None
     warnings: list[Warning]

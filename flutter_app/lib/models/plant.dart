@@ -9,6 +9,9 @@ class PredictedPlant {
   final String reason;
   final int observationCount;
   final PeakSeason? peakSeason;
+  final String? thumbnailUrl;
+  final int edibilityRating;
+  final int medicinalRating;
 
   PredictedPlant({
     required this.id,
@@ -19,6 +22,9 @@ class PredictedPlant {
     required this.reason,
     required this.observationCount,
     this.peakSeason,
+    this.thumbnailUrl,
+    this.edibilityRating = 0,
+    this.medicinalRating = 0,
   });
 
   factory PredictedPlant.fromJson(Map<String, dynamic> json) {
@@ -33,8 +39,27 @@ class PredictedPlant {
       peakSeason: json['peak_season'] != null
           ? PeakSeason.fromJson(json['peak_season'])
           : null,
+      thumbnailUrl: json['thumbnail_url'],
+      edibilityRating: json['edibility_rating'] ?? 0,
+      medicinalRating: json['medicinal_rating'] ?? 0,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'common_name': commonName,
+    'scientific_name': scientificName,
+    'confidence': confidence,
+    'confidence_score': confidenceScore,
+    'reason': reason,
+    'observation_count': observationCount,
+    'peak_season': peakSeason != null
+        ? {'start': peakSeason!.start, 'end': peakSeason!.end}
+        : null,
+    'thumbnail_url': thumbnailUrl,
+    'edibility_rating': edibilityRating,
+    'medicinal_rating': medicinalRating,
+  };
 }
 
 class PeakSeason {
@@ -85,11 +110,57 @@ class Guide {
   }
 }
 
+class PhysicalCharacteristics {
+  final String? habit;
+  final String? height;
+  final String? width;
+  final String? deciduousEvergreen;
+  final String? floweringTime;
+  final String? habitat;
+  final String? nativeRange;
+  final int? hardinessZone;
+  final String? pollinators;
+
+  PhysicalCharacteristics({
+    this.habit, this.height, this.width, this.deciduousEvergreen,
+    this.floweringTime, this.habitat, this.nativeRange,
+    this.hardinessZone, this.pollinators,
+  });
+
+  factory PhysicalCharacteristics.fromJson(Map<String, dynamic> json) {
+    return PhysicalCharacteristics(
+      habit: json['habit'],
+      height: json['height'],
+      width: json['width'],
+      deciduousEvergreen: json['deciduous_evergreen'],
+      floweringTime: json['flowering_time'],
+      habitat: json['habitat'],
+      nativeRange: json['native_range'],
+      hardinessZone: json['hardiness_zone'],
+      pollinators: json['pollinators'],
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'habit': habit, 'height': height, 'width': width,
+    'deciduous_evergreen': deciduousEvergreen,
+    'flowering_time': floweringTime, 'habitat': habitat,
+    'native_range': nativeRange, 'hardiness_zone': hardinessZone,
+    'pollinators': pollinators,
+  };
+
+  bool get isEmpty => habit == null && height == null && floweringTime == null &&
+      habitat == null && nativeRange == null;
+}
+
 class PlantDetail {
   final String id;
   final String commonName;
   final String scientificName;
   final String? family;
+  final int edibilityRating;
+  final int medicinalRating;
+  final PhysicalCharacteristics? physical;
   final List<EdiblePart> edibleParts;
   final String? traditionalUses;
   final List<PlantWarning> warnings;
@@ -101,6 +172,9 @@ class PlantDetail {
     required this.commonName,
     required this.scientificName,
     this.family,
+    this.edibilityRating = 0,
+    this.medicinalRating = 0,
+    this.physical,
     required this.edibleParts,
     this.traditionalUses,
     required this.warnings,
@@ -114,6 +188,11 @@ class PlantDetail {
       commonName: json['common_name'],
       scientificName: json['scientific_name'],
       family: json['family'],
+      edibilityRating: json['edibility_rating'] ?? 0,
+      medicinalRating: json['medicinal_rating'] ?? 0,
+      physical: json['physical'] != null
+          ? PhysicalCharacteristics.fromJson(json['physical'])
+          : null,
       edibleParts: (json['edible_parts'] as List)
           .map((e) => EdiblePart.fromJson(e))
           .toList(),

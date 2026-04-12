@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../services/api_client.dart';
+import '../services/guide_db.dart';
 import '../widgets/location_picker.dart';
 import 'guide_screen.dart';
 
@@ -12,13 +13,39 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final _apiClient = ApiClient();
 
   int _selectedWeekOffset = 1;
   bool _isLoading = false;
   String? _error;
   SelectedLocation? _selectedLocation;
+  List<SavedGuideEntry> _savedGuides = [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _loadSavedGuides();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadSavedGuides();
+    }
+  }
+
+  Future<void> _loadSavedGuides() async {
+    final guides = await GuideDatabase.listGuides();
+    if (mounted) setState(() => _savedGuides = guides);
+  }
 
   DateTime get _weekStart {
     final now = DateTime.now();
@@ -45,17 +72,30 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       if (mounted) {
-        Navigator.push(
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => GuideScreen(guide: guide),
           ),
         );
+        // Refresh saved guides when returning (user may have saved one)
+        _loadSavedGuides();
       }
     } on ApiException catch (e) {
       setState(() { _error = e.message; });
     } finally {
       if (mounted) setState(() { _isLoading = false; });
+    }
+  }
+
+  Future<void> _openSavedGuide(SavedGuideEntry entry) async {
+    final guide = await GuideDatabase.loadGuide(entry.id);
+    if (guide != null && mounted) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => GuideScreen(guide: guide)),
+      );
+      _loadSavedGuides();
     }
   }
 
@@ -237,7 +277,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 const SizedBox(height: ForageTheme.sp32),
 
-                // Saved guides section
+                // Saved guides section — live from SQLite
                 Text(
                   'SAVED GUIDES',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -246,37 +286,90 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                 ),
                 const SizedBox(height: ForageTheme.sp8),
-                Container(
-                  padding: const EdgeInsets.all(ForageTheme.sp24),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFFE0DDD4)),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.bookmark_border,
-                        size: 32,
-                        color: ForageTheme.textMuted.withValues(alpha: 0.5),
-                      ),
-                      const SizedBox(height: ForageTheme.sp8),
-                      Text(
-                        'No saved guides yet',
-                        style: TextStyle(
-                          color: ForageTheme.textMuted.withValues(alpha: 0.7),
-                        ),
-                      ),
-                      const SizedBox(height: ForageTheme.sp4),
-                      Text(
-                        'Generate your first guide above!',
-                        style: TextStyle(
-                          fontSize: 13,
+
+                if (_savedGuides.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(ForageTheme.sp24),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFFE0DDD4)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.bookmark_border,
+                          size: 32,
                           color: ForageTheme.textMuted.withValues(alpha: 0.5),
                         ),
+                        const SizedBox(height: ForageTheme.sp8),
+                        Text(
+                          'No saved guides yet',
+                          style: TextStyle(
+                            color: ForageTheme.textMuted.withValues(alpha: 0.7),
+                          ),
+                        ),
+                        const SizedBox(height: ForageTheme.sp4),
+                        Text(
+                          'Generate your first guide above!',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: ForageTheme.textMuted.withValues(alpha: 0.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  ...(_savedGuides.take(3).map((entry) => Padding(
+                    padding: const EdgeInsets.only(bottom: ForageTheme.sp8),
+                    child: InkWell(
+                      onTap: () => _openSavedGuide(entry),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.all(ForageTheme.sp12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: const Color(0xFFE0DDD4)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: ForageTheme.confHighBg,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.eco, size: 18, color: ForageTheme.primary),
+                            ),
+                            const SizedBox(width: ForageTheme.sp12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    entry.locationName ?? '${entry.lat.toStringAsFixed(2)}, ${entry.lng.toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${_monthDay(entry.dateStart)} - ${_monthDay(entry.dateEnd)}  •  ${entry.plantCount} plants',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: ForageTheme.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right, size: 18, color: ForageTheme.textMuted),
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
-                ),
+                    ),
+                  ))),
               ],
             ),
           ),
