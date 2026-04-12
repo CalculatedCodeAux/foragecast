@@ -158,6 +158,24 @@ class _GuideScreenState extends State<GuideScreen> {
             ),
           ),
 
+          // Safety disclaimer bar
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: ForageTheme.sp12, vertical: ForageTheme.sp8),
+            color: ForageTheme.dangerBg,
+            child: Row(
+              children: [
+                const Icon(Icons.shield_outlined, size: 14, color: ForageTheme.danger),
+                const SizedBox(width: ForageTheme.sp4),
+                Expanded(
+                  child: Text(
+                    'Planning aid only — verify all plants with a field guide before consuming.',
+                    style: TextStyle(fontSize: 11, color: ForageTheme.danger.withValues(alpha: 0.85)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           // Plant list
           Expanded(
             child: guide.plants.isEmpty

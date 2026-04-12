@@ -121,6 +121,54 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
 
           const SizedBox(height: ForageTheme.sp16),
 
+          // ── LIABILITY DISCLAIMER (always visible, safety-first) ──
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: ForageTheme.sp16),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(ForageTheme.sp12),
+              decoration: BoxDecoration(
+                color: ForageTheme.dangerBg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: ForageTheme.danger.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.shield_outlined, size: 20, color: ForageTheme.danger),
+                  const SizedBox(width: ForageTheme.sp8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Not an identification tool',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: ForageTheme.danger,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Always verify with a physical field guide before consuming. '
+                          'Some edible plants have toxic look-alikes that can cause serious harm or death.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: ForageTheme.danger.withValues(alpha: 0.85),
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: ForageTheme.sp16),
+
           // ── WARNINGS (safety-first — always above edibility) ──
           if (plant.warnings.isNotEmpty) ...[
             _sectionHeader(context, Icons.warning_amber_rounded, 'Known Hazards'),
