@@ -45,23 +45,27 @@ class _GuideScreenState extends State<GuideScreen> {
         // Save guide
         await GuideDatabase.saveGuide(widget.guide);
 
-        // Cache all plant details for offline use
+        // Cache all plant details + images for offline use
         final api = ApiClient();
         int cached = 0;
         for (final plant in widget.guide.plants) {
           try {
             final detail = await api.getPlantDetail(plant.id);
             await GuideDatabase.cachePlantDetail(detail);
+            // Download and cache all photos locally
+            if (detail.photos.isNotEmpty) {
+              await GuideDatabase.cacheImages(detail);
+            }
             cached++;
           } catch (_) {
-            // Skip plants that fail to fetch — user can retry later
+            // Skip plants that fail to fetch
           }
         }
 
         if (mounted) {
           setState(() { _isSaved = true; _saving = false; });
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Guide saved with $cached/${widget.guide.plants.length} plant details cached.')),
+            SnackBar(content: Text('Guide saved — $cached plants cached for offline.')),
           );
         }
       }

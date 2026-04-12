@@ -1,5 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:http/http.dart' as http;
 import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart' as pp;
 import 'package:sqflite/sqflite.dart';
 import '../models/plant.dart';
 
@@ -145,6 +148,53 @@ class GuideDatabase {
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+  }
+
+  /// Download and cache images for a plant's photos to local storage.
+  static Future<void> cacheImages(PlantDetail detail) async {
+    final dir = await _imageDir();
+    final client = http.Client();
+    try {
+      for (final photo in detail.photos) {
+        try {
+          final filename = _imageFilename(photo.url);
+          final file = File(join(dir.path, filename));
+          if (await file.exists()) continue;
+          final resp = await client.get(Uri.parse(photo.url)).timeout(
+            const Duration(seconds: 15),
+          );
+          if (resp.statusCode == 200) {
+            await file.writeAsBytes(resp.bodyBytes);
+          }
+        } catch (_) {
+          // Skip failed downloads
+        }
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+  /// Get local file path for a cached image, or null if not cached.
+  static Future<String?> getCachedImagePath(String url) async {
+    final dir = await _imageDir();
+    final file = File(join(dir.path, _imageFilename(url)));
+    if (await file.exists()) return file.path;
+    return null;
+  }
+
+  static Future<Directory> _imageDir() async {
+    final appDir = await pp.getApplicationDocumentsDirectory();
+    final imgDir = Directory(join(appDir.path, 'cached_images'));
+    if (!await imgDir.exists()) await imgDir.create(recursive: true);
+    return imgDir;
+  }
+
+  static String _imageFilename(String url) {
+    // Hash the URL to a safe filename
+    final hash = url.hashCode.toUnsigned(32).toRadixString(16);
+    final ext = url.contains('.jpeg') ? '.jpeg' : '.jpg';
+    return 'img_$hash$ext';
   }
 
   static Future<PlantDetail?> getCachedPlantDetail(String plantId) async {

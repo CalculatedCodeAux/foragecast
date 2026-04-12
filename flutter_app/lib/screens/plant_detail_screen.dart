@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../models/plant.dart';
@@ -396,41 +397,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Image.network(
-                  photo.url,
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, progress) {
-                    if (progress == null) return child;
-                    return Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        value: progress.expectedTotalBytes != null
-                            ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-                            : null,
-                      ),
-                    );
-                  },
-                  errorBuilder: (context, error, stack) {
-                    return Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.image_not_supported_outlined,
-                            size: 28, color: ForageTheme.textMuted),
-                        const SizedBox(height: ForageTheme.sp4),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: ForageTheme.sp8),
-                          child: Text(
-                            photo.label,
-                            style: const TextStyle(fontSize: 11, color: ForageTheme.textMuted),
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
+                _CachedImage(url: photo.url, label: photo.label),
                 Positioned(
                   left: 0, right: 0, bottom: 0,
                   child: Container(
@@ -564,6 +531,65 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
 }
 
 
+/// Image widget that checks local cache first, then falls back to network.
+class _CachedImage extends StatelessWidget {
+  final String url;
+  final String label;
+
+  const _CachedImage({required this.url, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String?>(
+      future: GuideDatabase.getCachedImagePath(url),
+      builder: (context, snapshot) {
+        final localPath = snapshot.data;
+        if (localPath != null) {
+          return Image.file(File(localPath), fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _networkFallback(),
+          );
+        }
+        return _networkFallback();
+      },
+    );
+  }
+
+  Widget _networkFallback() {
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            value: progress.expectedTotalBytes != null
+                ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                : null,
+          ),
+        );
+      },
+      errorBuilder: (context, error, stack) {
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.image_not_supported_outlined,
+                size: 28, color: ForageTheme.textMuted),
+            const SizedBox(height: ForageTheme.sp4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: ForageTheme.sp8),
+              child: Text(label,
+                style: const TextStyle(fontSize: 11, color: ForageTheme.textMuted),
+                textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 /// Full-screen photo viewer with swipe navigation.
 class _PhotoViewerScreen extends StatefulWidget {
   final List<PlantPhoto> photos;
@@ -612,15 +638,24 @@ class _PhotoViewerScreenState extends State<_PhotoViewerScreen> {
               return InteractiveViewer(
                 minScale: 1.0, maxScale: 4.0,
                 child: Center(
-                  child: Image.network(p.url, fit: BoxFit.contain,
-                    loadingBuilder: (ctx, child, progress) {
-                      if (progress == null) return child;
-                      return const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2));
+                  child: FutureBuilder<String?>(
+                    future: GuideDatabase.getCachedImagePath(p.url),
+                    builder: (ctx, snap) {
+                      final localPath = snap.data;
+                      final image = localPath != null
+                          ? Image.file(File(localPath), fit: BoxFit.contain)
+                          : Image.network(p.url, fit: BoxFit.contain,
+                              loadingBuilder: (ctx, child, progress) {
+                                if (progress == null) return child;
+                                return const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2));
+                              },
+                              errorBuilder: (ctx, e, s) => const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [Icon(Icons.broken_image, size: 48, color: Colors.white54), SizedBox(height: 8), Text('Failed to load image', style: TextStyle(color: Colors.white54))],
+                              ),
+                            );
+                      return image;
                     },
-                    errorBuilder: (ctx, e, s) => const Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [Icon(Icons.broken_image, size: 48, color: Colors.white54), SizedBox(height: 8), Text('Failed to load image', style: TextStyle(color: Colors.white54))],
-                    ),
                   ),
                 ),
               );
