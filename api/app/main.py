@@ -15,7 +15,6 @@ import secrets
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-import httpx
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -31,6 +30,7 @@ from app.models import (
     EmailSubscriber, Feedback, GuideCache, Observation, PlantMetadata,
 )
 from app.predict import predict_plants
+from app.photos import get_or_fetch_photos
 from app.schemas import (
     CoverageHexBin, CoverageResponse, EmailSubscribeRequest,
     FeedbackRequest, FeedbackResponse, GuideResponse, HealthResponse,
@@ -139,55 +139,6 @@ def get_prediction(
 # ── GET /plants/{plant_id} ───────────────────────────────────────────
 
 
-def _fetch_inat_photos(scientific_name: str, max_photos: int = 4) -> list[Photo]:
-    """Fetch CC-licensed photos from iNaturalist API by searching scientific name."""
-    try:
-        with httpx.Client(timeout=10) as client:
-            # Search for the taxon by scientific name
-            search = client.get(
-                "https://api.inaturalist.org/v1/taxa",
-                params={"q": scientific_name, "rank": "species", "per_page": 1},
-                headers={"User-Agent": "ForageCast/1.1.0"},
-            )
-            if search.status_code != 200:
-                return []
-            results = search.json().get("results", [])
-            if not results:
-                return []
-            inat_id = results[0].get("id")
-            if not inat_id:
-                return []
-
-            # Fetch full taxon detail (includes taxon_photos)
-            detail = client.get(
-                f"https://api.inaturalist.org/v1/taxa/{inat_id}",
-                headers={"User-Agent": "ForageCast/1.1.0"},
-            )
-            if detail.status_code != 200:
-                return []
-            taxon_results = detail.json().get("results", [])
-            if not taxon_results:
-                return []
-            taxon = taxon_results[0]
-
-            photos = []
-            for tp in taxon.get("taxon_photos", [])[:max_photos]:
-                photo = tp.get("photo", {})
-                url = photo.get("medium_url") or photo.get("url", "")
-                if not url:
-                    continue
-                url = url.replace("/square.", "/medium.")
-                photos.append(Photo(
-                    url=url,
-                    label="Observation photo",
-                    attribution=photo.get("attribution", "iNaturalist CC"),
-                ))
-            return photos
-    except Exception as e:
-        log.warning(f"iNat photo fetch failed for {scientific_name}: {e}")
-        return []
-
-
 @app.get("/plants/{plant_id}", response_model=PlantDetailResponse)
 def get_plant_detail(plant_id: str, db: Session = Depends(get_db)):
     meta = db.query(PlantMetadata).filter_by(id=plant_id).first()
@@ -210,24 +161,7 @@ def get_plant_detail(plant_id: str, db: Session = Depends(get_db)):
             except (TypeError, KeyError):
                 continue
 
-    photos = []
-    if meta.photos:
-        for p in meta.photos:
-            try:
-                photos.append(Photo(**p))
-            except (TypeError, KeyError):
-                continue
-
-    # If no stored photos, fetch from iNaturalist on-demand
-    if not photos and meta.scientific_name:
-        photos = _fetch_inat_photos(meta.scientific_name)
-        # Cache the fetched photos back to the DB for next time
-        if photos:
-            try:
-                meta.photos = [{"url": p.url, "label": p.label, "attribution": p.attribution} for p in photos]
-                db.commit()
-            except Exception:
-                db.rollback()
+    photos = get_or_fetch_photos(meta, db)
 
     # Build physical characteristics
     physical = None
