@@ -150,25 +150,32 @@ class GuideDatabase {
     );
   }
 
-  /// Download and cache images for a plant's photos to local storage.
-  static Future<void> cacheImages(PlantDetail detail) async {
+  /// Download and cache images for a plant's photos + thumbnail to local storage.
+  static Future<void> cacheImages(PlantDetail detail, {String? thumbnailUrl}) async {
     final dir = await _imageDir();
     final client = http.Client();
     try {
+      // Collect all URLs to cache (photos + thumbnail)
+      final urls = <String>{};
       for (final photo in detail.photos) {
+        urls.add(photo.url);
+      }
+      if (thumbnailUrl != null) {
+        urls.add(thumbnailUrl);
+      }
+
+      for (final url in urls) {
         try {
-          final filename = _imageFilename(photo.url);
+          final filename = _imageFilename(url);
           final file = File(join(dir.path, filename));
           if (await file.exists()) continue;
-          final resp = await client.get(Uri.parse(photo.url)).timeout(
+          final resp = await client.get(Uri.parse(url)).timeout(
             const Duration(seconds: 15),
           );
           if (resp.statusCode == 200) {
             await file.writeAsBytes(resp.bodyBytes);
           }
-        } catch (_) {
-          // Skip failed downloads
-        }
+        } catch (_) {}
       }
     } finally {
       client.close();

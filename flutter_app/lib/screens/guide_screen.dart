@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../models/plant.dart';
@@ -52,10 +53,8 @@ class _GuideScreenState extends State<GuideScreen> {
           try {
             final detail = await api.getPlantDetail(plant.id);
             await GuideDatabase.cachePlantDetail(detail);
-            // Download and cache all photos locally
-            if (detail.photos.isNotEmpty) {
-              await GuideDatabase.cacheImages(detail);
-            }
+            // Download and cache all photos + thumbnail locally
+            await GuideDatabase.cacheImages(detail, thumbnailUrl: plant.thumbnailUrl);
             cached++;
           } catch (_) {
             // Skip plants that fail to fetch
@@ -293,7 +292,7 @@ class _PlantRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Thumbnail
+            // Thumbnail — cached local first, then network
             Container(
               width: 48,
               height: 48,
@@ -303,12 +302,7 @@ class _PlantRow extends StatelessWidget {
               ),
               clipBehavior: Clip.antiAlias,
               child: plant.thumbnailUrl != null
-                  ? Image.network(
-                      plant.thumbnailUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          const Icon(Icons.eco, size: 22, color: ForageTheme.primary),
-                    )
+                  ? _ThumbnailImage(url: plant.thumbnailUrl!)
                   : const Icon(Icons.eco, size: 22, color: ForageTheme.primary),
             ),
             const SizedBox(width: ForageTheme.sp12),
@@ -369,6 +363,64 @@ class _PlantRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Thumbnail that checks local cache first, then loads from network with
+/// a loading indicator. Never shows a blank space.
+class _ThumbnailImage extends StatefulWidget {
+  final String url;
+  const _ThumbnailImage({required this.url});
+
+  @override
+  State<_ThumbnailImage> createState() => _ThumbnailImageState();
+}
+
+class _ThumbnailImageState extends State<_ThumbnailImage> {
+  String? _localPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkCache();
+  }
+
+  Future<void> _checkCache() async {
+    final path = await GuideDatabase.getCachedImagePath(widget.url);
+    if (mounted) setState(() => _localPath = path);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Show local cached image if available
+    if (_localPath != null) {
+      return Image.file(
+        File(_localPath!),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _networkImage(),
+      );
+    }
+
+    // Still checking cache — show network image immediately (don't wait)
+    return _networkImage();
+  }
+
+  Widget _networkImage() {
+    return Image.network(
+      widget.url,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return const Center(
+          child: SizedBox(
+            width: 16, height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        );
+      },
+      errorBuilder: (_, __, ___) =>
+          const Icon(Icons.eco, size: 22, color: ForageTheme.primary),
     );
   }
 }
